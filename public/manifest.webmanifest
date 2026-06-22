@@ -1,0 +1,9 @@
+{
+  "name": "Weight Path",
+  "short_name": "Weight Path",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f7f3",
+  "theme_color": "#2f6b56",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
