@@ -41,15 +41,20 @@ export interface BackupFile {
   logs: DailyLog[]
 }
 
+const localToday = () => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 export const defaultSettings: AppSettings = {
   heightCm: 176,
   startingWeightKg: 111,
   targetLowKg: 92,
   targetHighKg: 96,
-  planStartDate: new Date().toISOString().slice(0, 10),
+  planStartDate: localToday(),
 }
 
-export const emptyLog = (date = new Date().toISOString().slice(0, 10)): DailyLog => {
+export const emptyLog = (date = localToday()): DailyLog => {
   const now = new Date().toISOString()
   return {
     id: crypto.randomUUID(), date, weightKg: null, eatingWindowStart: '12:00', eatingWindowEnd: '18:00', fastingHours: null,

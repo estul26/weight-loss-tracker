@@ -14,7 +14,8 @@ interface TrackerState { _id: 'owner'; settings: AppSettings; logs: DailyLog[]; 
 for (const key of ['MONGO_URI', 'APP_PASSWORD', 'SESSION_SECRET'] as const) if (!process.env[key]) throw new Error(`${key} must be set`)
 const mongo = new MongoClient(process.env.MONGO_URI!)
 let collection: Collection<TrackerState>
-const defaults = (): AppSettings => ({ heightCm: 176, startingWeightKg: 111, targetLowKg: 92, targetHighKg: 96, planStartDate: new Date().toISOString().slice(0, 10) })
+const today = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` }
+const defaults = (): AppSettings => ({ heightCm: 176, startingWeightKg: 111, targetLowKg: 92, targetHighKg: 96, planStartDate: today() })
 const app = express()
 app.set('trust proxy', 1)
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }))

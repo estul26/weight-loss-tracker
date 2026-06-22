@@ -1,6 +1,12 @@
 import type { AppSettings, DailyLog } from './types'
 
-export const dateKey = (date: Date) => date.toISOString().slice(0, 10)
+/** A local calendar date, deliberately not a UTC ISO date. */
+export const dateKey = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 export const dateFromKey = (key: string) => new Date(`${key}T12:00:00`)
 export const fmtDate = (key: string, options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }) => dateFromKey(key).toLocaleDateString(undefined, options)
 export const fmtNum = (n: number | null | undefined, decimals = 1) => n == null || Number.isNaN(n) ? '—' : n.toFixed(decimals)
@@ -26,6 +32,17 @@ export const fastingGoal = (settings: AppSettings) => {
   if (month <= 3) return 16
   if (month <= 9) return 18
   return 16
+}
+export const targetProgress = (weight: number, settings: AppSettings) => {
+  const distance = settings.startingWeightKg - settings.targetHighKg
+  if (distance <= 0) return 0
+  return Math.max(0, Math.min(100, ((settings.startingWeightKg - weight) / distance) * 100))
+}
+export const weightChange = (weight: number, settings: AppSettings) => settings.startingWeightKg - weight
+export const trendChange = (logs: DailyLog[]) => {
+  const weights = logs.filter((log) => log.weightKg != null).sort((a, b) => a.date.localeCompare(b.date))
+  if (weights.length < 2) return null
+  return weights.at(-1)!.weightKg! - weights[0].weightKg!
 }
 export const currentStreak = (logs: DailyLog[], goal: number) => {
   const byDate = new Map(logs.map((log) => [log.date, log])); let cursor = new Date(); let count = 0
