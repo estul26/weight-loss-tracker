@@ -13,10 +13,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
+    name: Build application
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v22
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production assets
+        run: npm run build
+
+  deploy:
+    name: Deploy to VPS
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check deployment configuration
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          set -eu
+          for name in VPS_HOST VPS_PORT VPS_USER SSH_KEY; do
+            value="${!name}"
+            if [ -z "$value" ]; then
+              echo "Required repository secret $name is not configured."
+              exit 1
+            fi
+          done
+          case "$VPS_USER" in
+            *' '*|$'\t'*|$'\n'*)
+              echo "VPS_USER must not contain whitespace."
+              exit 1
+              ;;
+          esac
 
       - name: Upload application source
         uses: appleboy/scp-action@v1.0.0
