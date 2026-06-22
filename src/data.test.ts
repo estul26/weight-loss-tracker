@@ -26,4 +26,11 @@ describe('tracker calculations', () => {
     expect(currentStreak(records, 16)).toBe(2)
     expect(compliance(records, 16)).toBe(100)
   })
+
+  it('can create a daily log without crypto.randomUUID', () => {
+    const originalRandomUuid = globalThis.crypto.randomUUID
+    Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: undefined })
+    expect(emptyLog('2026-06-03').id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: originalRandomUuid })
+  })
 })
