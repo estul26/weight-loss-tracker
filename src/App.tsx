@@ -44,7 +44,6 @@ function App() {
   return <div className="app-shell">
     <header className="app-header"><div className="app-header-inner"><button onClick={() => navigate('home')} className="brand" aria-label="Weight Path home"><span>W</span><span><b>Weight Path</b><small>Private daily tracker</small></span></button><nav className="desktop-nav" aria-label="Main navigation">{navigation.map((item) => <NavButton key={item.id} item={item} active={primaryPage === item.id} onClick={() => item.id === 'checkin' ? openCheckIn() : navigate(item.id)} />)}</nav><div className="header-actions"><span className="sync-status">Synced</span><button className="logout-button" onClick={() => void logout()}>Log out</button></div></div></header>
     <main className="app-main">
-      {location.protocol === 'http:' && <div className="notice notice-error mb-5"><span><b>Insecure connection:</b> This direct HTTP deployment does not encrypt your password or health data. Use a trusted network only.</span></div>}
       {migrationAvailable && <div className="notice notice-info mb-5"><span>Daily logs from the old browser-only app are ready to move.</span><button className="btn-secondary" onClick={() => void migrate()}>Move them to MongoDB</button></div>}
       {notice && <div className="notice notice-good mb-5" role="status"><span>{notice}</span><button className="icon-button" onClick={() => setNotice('')} aria-label="Dismiss notice">×</button></div>}
       {page === 'home' && <Dashboard logs={ordered} settings={settings} onCheckIn={() => openCheckIn()} />}
