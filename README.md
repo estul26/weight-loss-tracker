@@ -1,4 +1,4 @@
-# Weight Path
+# Weight Path 
 
 Private single-user weight-loss and fasting tracker backed by MongoDB. The app stores one date-unique daily check-in, settings, and backups; it is not medical advice.
 
