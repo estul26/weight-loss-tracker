@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
 import { addDays, dateKey, fmtDate, fmtNum } from '../data'
+import { parseAppSettings, parseDailyLogInput } from '../../shared/tracker'
 import { backup } from '../storage'
 import { emptyLog, type AppSettings, type DailyLog, type RefinedCarbs } from '../types'
 import { Dialog, EmptyState, Icon, SectionTitle } from '../components/ui'
 
 const csvColumns: (keyof DailyLog)[] = ['id', 'date', 'weightKg', 'eatingWindowStart', 'eatingWindowEnd', 'fastingHours', 'firstMeal', 'secondMeal', 'snacks', 'lateNightEating', 'sugaryDrink', 'refinedCarbs', 'exerciseType', 'exerciseMinutes', 'sleepHours', 'hungerLevel', 'energyLevel', 'moodLevel', 'notes', 'biggestProblem', 'tomorrowFocus', 'createdAt', 'updatedAt']
+const requiredCsvColumns = csvColumns.filter((column) => !['id', 'createdAt', 'updatedAt'].includes(column))
 const csvValue = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
 const toNumber = (value: string) => value === '' ? null : Number(value)
 
@@ -51,7 +53,7 @@ export function History({ logs, settings, onEdit, onDelete, onImport }: { logs: 
       <div className="history-cards md:hidden">{shown.map((log) => <HistoryCard key={log.id} log={log} checked={selected.includes(log.id)} onChoose={() => choose(log.id)} onEdit={() => onEdit(log)} onDelete={() => setDeleteTarget(log)} />)}</div>
       <div className="history-table hidden md:block"><table><thead><tr><th><input aria-label="Select visible records" type="checkbox" checked={shown.length > 0 && shown.every((log) => selected.includes(log.id))} onChange={(event) => chooseAll(event.target.checked)} /></th><th>Date</th><th>Weight</th><th>Fast</th><th>Food flags</th><th>Exercise</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{shown.map((log) => <tr key={log.id}><td><input aria-label={`Select ${fmtDate(log.date)}`} type="checkbox" checked={selected.includes(log.id)} onChange={() => choose(log.id)} /></td><td className="font-semibold">{fmtDate(log.date)}</td><td>{log.weightKg == null ? '—' : `${fmtNum(log.weightKg)} kg`}</td><td>{log.fastingHours == null ? '—' : `${fmtNum(log.fastingHours)} h`}</td><td>{flags(log)}</td><td>{log.exerciseMinutes ? `${log.exerciseMinutes} min` : '—'}</td><td className="whitespace-nowrap"><button className="text-link" onClick={() => onEdit(log)}>Edit</button><button className="text-link danger-link" onClick={() => setDeleteTarget(log)}>Delete</button></td></tr>)}</tbody></table></div>
     </>}
-    {pendingImport && !confirmReplace && <Dialog title="Import your records" onClose={() => setPendingImport(null)}><p className="dialog-copy"><b>{pendingImport.logs.length} record{pendingImport.logs.length === 1 ? '' : 's'}</b> found in {pendingImport.name}. How should they be added?</p><div className="dialog-actions"><button className="btn-secondary" disabled={busy} onClick={() => void runImport('merge')}>Merge records</button><button className="btn-danger" disabled={busy} onClick={() => setConfirmReplace(true)}>Replace all records</button></div><p className="dialog-note">Merge replaces only matching dates. Replace removes your current records first.</p></Dialog>}
+    {pendingImport && !confirmReplace && <Dialog title="Import your records" onClose={() => setPendingImport(null)}><p className="dialog-copy"><b>{pendingImport.logs.length} record{pendingImport.logs.length === 1 ? '' : 's'}</b> found in {pendingImport.name}. How should they be added?</p><div className="dialog-actions"><button className="btn-secondary" disabled={busy} onClick={() => void runImport('merge')}>Merge records</button><button className="btn-danger" disabled={busy} onClick={() => setConfirmReplace(true)}>Replace all records</button></div><p className="dialog-note">Merge replaces only matching dates. Replace removes current records and, for JSON backups, restores their settings.</p></Dialog>}
     {pendingImport && confirmReplace && <Dialog title="Replace all current records?" onClose={() => setConfirmReplace(false)}><p className="dialog-copy">This will permanently replace your existing {logs.length} record{logs.length === 1 ? '' : 's'} with the {pendingImport.logs.length} record{pendingImport.logs.length === 1 ? '' : 's'} in this import.</p><div className="dialog-actions"><button className="btn-secondary" disabled={busy} onClick={() => setConfirmReplace(false)}>Go back</button><button className="btn-danger" disabled={busy} onClick={() => void runImport('replace')}>{busy ? 'Replacing…' : 'Yes, replace records'}</button></div></Dialog>}
     {deleteTarget && <Dialog title="Delete this check-in?" onClose={() => setDeleteTarget(null)}><p className="dialog-copy">The record for <b>{fmtDate(deleteTarget.date)}</b> will be permanently deleted.</p><div className="dialog-actions"><button className="btn-secondary" disabled={busy} onClick={() => setDeleteTarget(null)}>Keep record</button><button className="btn-danger" disabled={busy} onClick={() => void runDelete()}>{busy ? 'Deleting…' : 'Delete record'}</button></div></Dialog>}
   </>
@@ -65,11 +67,36 @@ function flags(log: DailyLog) { return [log.sugaryDrink && 'Sugar', log.snacks &
 function download(name: string, type: string, content: string) { const url = URL.createObjectURL(new Blob([content], { type })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = name; anchor.click(); URL.revokeObjectURL(url) }
 
 async function parseBackup(file: File): Promise<PendingImport> {
+  if (file.size > 5 * 1024 * 1024) throw new Error('Imports are limited to 5 MB.')
   const text = await file.text(); let entries: DailyLog[] = []; let settings: AppSettings | undefined
-  if (file.name.toLowerCase().endsWith('.json')) { const data = JSON.parse(text) as { logs?: DailyLog[]; settings?: AppSettings }; if (!Array.isArray(data.logs)) throw new Error('This JSON backup does not contain daily records.'); entries = data.logs; settings = data.settings }
-  else { const [headerRow, ...csvRows] = parseCsv(text); const headers = headerRow ?? []; entries = csvRows.filter((values) => values.some(Boolean)).map((values) => { const row = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ''])); const log = emptyLog(row.date); Object.assign(log, row, { weightKg: toNumber(row.weightKg), fastingHours: toNumber(row.fastingHours), exerciseMinutes: toNumber(row.exerciseMinutes), sleepHours: toNumber(row.sleepHours), hungerLevel: toNumber(row.hungerLevel), energyLevel: toNumber(row.energyLevel), moodLevel: toNumber(row.moodLevel), snacks: row.snacks === 'true', lateNightEating: row.lateNightEating === 'true', sugaryDrink: row.sugaryDrink === 'true', refinedCarbs: (['none', 'low', 'medium', 'high'].includes(row.refinedCarbs) ? row.refinedCarbs : 'none') as RefinedCarbs }); return log }) }
-  if (!entries.length || entries.some((entry) => !/^\d{4}-\d{2}-\d{2}$/.test(entry.date))) throw new Error('No valid dated records were found in this file.')
+  if (file.name.toLowerCase().endsWith('.json')) {
+    const data = JSON.parse(text) as { version?: unknown; logs?: unknown; settings?: unknown }
+    if (data.version !== undefined && data.version !== 2) throw new Error('This JSON backup version is not supported.')
+    if (!Array.isArray(data.logs)) throw new Error('This JSON backup does not contain daily records.')
+    entries = data.logs.map((row, index) => toImportedLog(row, index + 1))
+    if (data.settings !== undefined) {
+      const parsed = parseAppSettings(data.settings)
+      if (!parsed.ok) throw new Error(`Backup settings are invalid: ${parsed.error}`)
+      settings = parsed.value
+    }
+  } else {
+    const [headerRow, ...csvRows] = parseCsv(text); const headers = (headerRow ?? []).map((header, index) => index === 0 ? header.replace(/^\uFEFF/, '') : header)
+    if (!requiredCsvColumns.every((column) => headers.includes(column))) throw new Error('This CSV does not contain every required Weight Path column.')
+    if (new Set(headers).size !== headers.length) throw new Error('This CSV has duplicate column names.')
+    entries = csvRows.filter((values) => values.some((value) => value !== '')).map((values, index) => {
+      const row = Object.fromEntries(headers.map((header, column) => [header, values[column] ?? '']))
+      return toImportedLog({ ...row, weightKg: toNumber(row.weightKg), fastingHours: toNumber(row.fastingHours), exerciseMinutes: toNumber(row.exerciseMinutes), sleepHours: toNumber(row.sleepHours), hungerLevel: toNumber(row.hungerLevel), energyLevel: toNumber(row.energyLevel), moodLevel: toNumber(row.moodLevel), snacks: toBoolean(row.snacks), lateNightEating: toBoolean(row.lateNightEating), sugaryDrink: toBoolean(row.sugaryDrink), refinedCarbs: row.refinedCarbs as RefinedCarbs }, index + 2)
+    })
+  }
+  if (!entries.length) throw new Error('No daily records were found in this file.')
+  if (new Set(entries.map((entry) => entry.date)).size !== entries.length) throw new Error('This import contains more than one record for the same date.')
   return { logs: entries, settings, name: file.name }
 }
 
-function parseCsv(text: string) { const rows: string[][] = []; let row: string[] = []; let value = ''; let quoted = false; for (let index = 0; index < text.length; index++) { const char = text[index]; if (char === '"') { if (quoted && text[index + 1] === '"') { value += '"'; index++ } else quoted = !quoted } else if (char === ',' && !quoted) { row.push(value); value = '' } else if ((char === '\n' || char === '\r') && !quoted) { if (char === '\r' && text[index + 1] === '\n') index++; row.push(value); rows.push(row); row = []; value = '' } else value += char } if (value || row.length) { row.push(value); rows.push(row) } return rows }
+function toImportedLog(value: unknown, row: number): DailyLog {
+  const parsed = parseDailyLogInput(value)
+  if (!parsed.ok) throw new Error(`Record ${row}: ${parsed.error}`)
+  return { ...emptyLog(parsed.value.date), ...parsed.value }
+}
+function toBoolean(value: string) { return value === 'true' ? true : value === 'false' ? false : value }
+function parseCsv(text: string) { const rows: string[][] = []; let row: string[] = []; let value = ''; let quoted = false; for (let index = 0; index < text.length; index++) { const char = text[index]; if (char === '"') { if (quoted && text[index + 1] === '"') { value += '"'; index++ } else quoted = !quoted } else if (char === ',' && !quoted) { row.push(value); value = '' } else if ((char === '\n' || char === '\r') && !quoted) { if (char === '\r' && text[index + 1] === '\n') index++; row.push(value); rows.push(row); row = []; value = '' } else value += char } if (quoted) throw new Error('This CSV has an unfinished quoted value.'); if (value || row.length) { row.push(value); rows.push(row) } return rows }

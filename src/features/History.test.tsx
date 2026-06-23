@@ -24,4 +24,11 @@ describe('History confirmations', () => {
     expect(screen.getByRole('button', { name: 'Merge records' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Replace all records' })).toBeInTheDocument()
   })
+
+  it('shows an actionable error for a malformed CSV import', async () => {
+    const view = render(<History logs={[]} settings={settings} onEdit={() => undefined} onDelete={async () => undefined} onImport={async () => undefined} />)
+    const file = new File(['date,weightKg\n2026-06-20,100'], 'weight-path.csv', { type: 'text/csv' })
+    fireEvent.change(view.container.querySelector('input[type="file"]')!, { target: { files: [file] } })
+    expect(await screen.findByRole('alert')).toHaveTextContent('required Weight Path column')
+  })
 })

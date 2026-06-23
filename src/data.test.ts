@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compliance, currentStreak, dateKey, fastingGoal, goalDaysRemaining, requiredWeeklyLoss, targetProgress, trendChange } from './data'
+import { compliance, currentStreak, dateKey, fastingGoal, goalDaysRemaining, hasWeightPlateau, latestLog, requiredWeeklyLoss, targetProgress, trendChange } from './data'
 import { addCalendarYear, defaultSettings, emptyLog, isDateKey, normalizeSettings, type AppSettings } from './types'
 
 const settings: AppSettings = { heightCm: 170, startingWeightKg: 100, goalWeightKg: 85, planStartDate: '2026-06-01', goalDate: '2027-06-01' }
@@ -46,6 +46,23 @@ describe('tracker calculations', () => {
     const records = [log(today, 95), log(yesterday, 95.2)]
     expect(currentStreak(records, 16)).toBe(2)
     expect(compliance(records, 16)).toBe(100)
+  })
+
+  it('keeps a completed fasting streak through yesterday and excludes future weights', () => {
+    const today = dateKey(new Date())
+    const yesterday = dateKey(new Date(new Date().setDate(new Date().getDate() - 1)))
+    const twoDaysAgo = dateKey(new Date(new Date().setDate(new Date().getDate() - 2)))
+    const tomorrow = dateKey(new Date(new Date().setDate(new Date().getDate() + 1)))
+    const records = [log(yesterday, 95), log(twoDaysAgo, 95.3), log(tomorrow, 80)]
+    expect(currentStreak(records, 16, today)).toBe(2)
+    expect(latestLog(records, today)?.weightKg).toBe(95)
+    expect(trendChange(records, today)).toBeCloseTo(-0.3)
+  })
+
+  it('only identifies a plateau when recent weekly averages stay within the tolerance', () => {
+    expect(hasWeightPlateau([100, 99.95, 100.02, 99.98])).toBe(true)
+    expect(hasWeightPlateau([100, 101, 102, 103])).toBe(false)
+    expect(hasWeightPlateau([100, 99, 98, 97])).toBe(false)
   })
 
   it('can create a daily log without crypto.randomUUID', () => {

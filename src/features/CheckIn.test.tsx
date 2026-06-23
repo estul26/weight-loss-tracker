@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { CheckIn } from './CheckIn'
+import { dateKey } from '../data'
 import { emptyLog } from '../types'
 
 describe('CheckIn', () => {
@@ -18,5 +19,10 @@ describe('CheckIn', () => {
     render(<CheckIn logs={[]} selectedDate="2026-06-02" onDateChange={() => undefined} onSave={async () => { throw new Error('Network unavailable') }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Save today' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Network unavailable')
+  })
+
+  it('does not offer future dates in the check-in date picker', () => {
+    render(<CheckIn logs={[]} selectedDate="2026-06-02" onDateChange={() => undefined} onSave={async () => emptyLog('2026-06-02')} />)
+    expect(screen.getByLabelText('Date')).toHaveAttribute('max', dateKey(new Date()))
   })
 })

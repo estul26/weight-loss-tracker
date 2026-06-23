@@ -14,7 +14,7 @@ export const average = (values: Array<number | null | undefined>) => {
   const actual = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
   return actual.length ? actual.reduce((a, b) => a + b, 0) / actual.length : null
 }
-export const latestLog = (logs: DailyLog[]) => [...logs].filter((l) => l.weightKg != null).sort((a, b) => b.date.localeCompare(a.date))[0]
+export const latestLog = (logs: DailyLog[], today = dateKey(new Date())) => [...logs].filter((log) => log.date <= today && log.weightKg != null).sort((a, b) => b.date.localeCompare(a.date))[0]
 export const bmi = (weight: number, heightCm: number) => weight / ((heightCm / 100) ** 2)
 export const weekStart = (input: Date) => {
   const date = new Date(input); date.setHours(12, 0, 0, 0)
@@ -52,21 +52,27 @@ export const requiredWeeklyLoss = (weight: number, settings: AppSettings, today 
   if (remainingLoss <= 0) return 0
   return remainingDays > 0 ? remainingLoss / (remainingDays / 7) : null
 }
-export const trendChange = (logs: DailyLog[]) => {
-  const weights = logs.filter((log) => log.weightKg != null).sort((a, b) => a.date.localeCompare(b.date))
+export const trendChange = (logs: DailyLog[], today = dateKey(new Date())) => {
+  const weights = logs.filter((log) => log.date <= today && log.weightKg != null).sort((a, b) => a.date.localeCompare(b.date))
   if (weights.length < 2) return null
   return weights.at(-1)!.weightKg! - weights[0].weightKg!
 }
-export const currentStreak = (logs: DailyLog[], goal: number) => {
-  const byDate = new Map(logs.map((log) => [log.date, log])); let cursor = new Date(); let count = 0
+export const currentStreak = (logs: DailyLog[], goal: number, today = dateKey(new Date())) => {
+  const byDate = new Map(logs.filter((log) => log.date <= today).map((log) => [log.date, log]))
+  let cursor = dateFromKey(today)
+  if (!byDate.has(today)) cursor = addDays(cursor, -1)
+  let count = 0
   while (true) { const log = byDate.get(dateKey(cursor)); if (!log || (log.fastingHours ?? 0) < goal) break; count++; cursor = addDays(cursor, -1) }
   return count
 }
-export const compliance = (logs: DailyLog[], goal: number) => {
-  if (!logs.length) return null
-  const score = logs.reduce((sum, log) => sum + ((log.fastingHours ?? 0) >= goal ? 30 : 0) + (!log.sugaryDrink ? 20 : 0) + (!log.snacks ? 15 : 0) + (!log.lateNightEating ? 15 : 0) + (['none', 'low'].includes(log.refinedCarbs) ? 10 : 0) + ((log.exerciseMinutes ?? 0) >= 20 ? 5 : 0) + ((log.sleepHours ?? 0) >= 7 ? 5 : 0), 0)
-  return Math.round(score / logs.length)
+export const compliance = (logs: DailyLog[], goal: number, today = dateKey(new Date())) => {
+  const completed = logs.filter((log) => log.date <= today)
+  if (!completed.length) return null
+  const score = completed.reduce((sum, log) => sum + ((log.fastingHours ?? 0) >= goal ? 30 : 0) + (!log.sugaryDrink ? 20 : 0) + (!log.snacks ? 15 : 0) + (!log.lateNightEating ? 15 : 0) + (['none', 'low'].includes(log.refinedCarbs) ? 10 : 0) + ((log.exerciseMinutes ?? 0) >= 20 ? 5 : 0) + ((log.sleepHours ?? 0) >= 7 ? 5 : 0), 0)
+  return Math.round(score / completed.length)
 }
+
+export const hasWeightPlateau = (weeklyAverages: number[], toleranceKg = 0.1) => weeklyAverages.length >= 4 && weeklyAverages.slice(-4).every((value, index, values) => index === 0 || Math.abs(values[index - 1] - value) < toleranceKg)
 export function feedback(log: DailyLog) {
   const messages: { kind: 'good' | 'warn'; text: string }[] = []
   if (log.sugaryDrink) messages.push({ kind: 'warn', text: 'Sugar may make progress harder. Choose water, tea, or coffee without sugar tomorrow.' })

@@ -9,20 +9,21 @@ type Point = { label: string; value: number }
 export function Dashboard({ logs, settings, onCheckIn }: { logs: DailyLog[]; settings: AppSettings; onCheckIn: () => void }) {
   const [range, setRange] = useState<Range>(30)
   const today = new Date()
-  const latest = latestLog(logs)
+  const todayKey = dateKey(today)
+  const latest = latestLog(logs, todayKey)
   const currentWeight = latest?.weightKg ?? settings.startingWeightKg
   const cutoff = dateKey(addDays(today, -(range - 1)))
-  const periodLogs = useMemo(() => logs.filter((log) => log.date >= cutoff).sort((a, b) => a.date.localeCompare(b.date)), [logs, cutoff])
+  const periodLogs = useMemo(() => logs.filter((log) => log.date >= cutoff && log.date <= todayKey).sort((a, b) => a.date.localeCompare(b.date)), [logs, cutoff, todayKey])
   const weightPoints = periodLogs.filter((log) => log.weightKg != null).map((log) => ({ label: fmtDate(log.date), value: log.weightKg! }))
-  const fastingPoints = periodLogs.map((log) => ({ label: fmtDate(log.date), value: log.fastingHours ?? 0 }))
+  const fastingPoints = periodLogs.filter((log) => log.fastingHours != null).map((log) => ({ label: fmtDate(log.date), value: log.fastingHours! }))
   const goal = fastingGoal(settings)
-  const week = logs.filter((log) => log.date >= dateKey(weekStart(today)) && log.date <= dateKey(addDays(weekStart(today), 6)))
-  const todayLogged = logs.some((log) => log.date === dateKey(today))
-  const trend = trendChange(periodLogs)
+  const week = logs.filter((log) => log.date >= dateKey(weekStart(today)) && log.date <= todayKey)
+  const todayLogged = logs.some((log) => log.date === todayKey)
+  const trend = trendChange(periodLogs, todayKey)
   const progress = targetProgress(currentWeight, settings)
-  const sevenDays = logs.filter((log) => log.date >= dateKey(addDays(today, -6)))
-  const daysRemaining = goalDaysRemaining(settings, dateKey(today))
-  const weeklyPace = requiredWeeklyLoss(currentWeight, settings, dateKey(today))
+  const sevenDays = logs.filter((log) => log.date >= dateKey(addDays(today, -6)) && log.date <= todayKey)
+  const daysRemaining = goalDaysRemaining(settings, todayKey)
+  const weeklyPace = requiredWeeklyLoss(currentWeight, settings, todayKey)
   const isLossPlan = settings.goalWeightKg < settings.startingWeightKg
   const goalReached = isLossPlan && currentWeight <= settings.goalWeightKg
   const deadlineLabel = !isLossPlan ? 'Weight-loss tracking unavailable' : goalReached ? 'Goal achieved' : daysRemaining < 0 ? `${Math.abs(daysRemaining)} days past target date` : `${daysRemaining} days remaining`
@@ -36,7 +37,7 @@ export function Dashboard({ logs, settings, onCheckIn }: { logs: DailyLog[]; set
       <div className="progress-hero-side"><div className="flex items-center justify-between text-sm"><span className="font-semibold text-emerald-950">Path to target</span><span className="font-bold text-emerald-800">{progress == null ? 'Unavailable' : `${Math.round(progress)}%`}</span></div>{progress == null ? <p className="mt-3 text-sm text-emerald-950/70">Progress and pace are available for a goal below your plan baseline.</p> : <div className="progress-track" role="progressbar" aria-label="Progress toward target weight" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><span style={{ width: `${progress}%` }} /></div>}<div className="flex justify-between text-xs text-emerald-950/65"><span>Start {fmtNum(settings.startingWeightKg, 1)}</span><span>Goal {fmtNum(settings.goalWeightKg, 0)} kg</span></div><div className="hero-target"><Icon name="target" className="h-4 w-4" />Goal {fmtNum(settings.goalWeightKg, 0)} kg by {fmtDate(settings.goalDate)}</div><div className="hero-goal-meta"><div><span>Deadline</span><b>{deadlineLabel}</b></div><div><span>Required pace</span><b>{paceLabel}</b></div></div></div>
     </section>
 
-    <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4"><Stat label="7-day average" value={`${fmtNum(average(sevenDays.map((log) => log.weightKg)))} kg`} hint={sevenDays.length ? `${sevenDays.length} logged day${sevenDays.length === 1 ? '' : 's'}` : 'Add a weigh-in to begin'} /><Stat label={`${range}-day trend`} value={trend == null ? '—' : `${trend > 0 ? '+' : ''}${fmtNum(trend)} kg`} hint={trend == null ? 'Two weigh-ins reveal a trend' : trend <= 0 ? 'Moving in your chosen direction' : 'A normal fluctuation'} tone={trend != null && trend <= 0 ? 'green' : trend != null ? 'amber' : 'plain'} /><Stat label="Fasting streak" value={`${currentStreak(logs, goal)} days`} hint={`Current goal: ${goal}+ hours`} tone="soft" /><Stat label="This week" value={compliance(week, goal) == null ? '—' : `${compliance(week, goal)}%`} hint="Routine score" tone="green" /></section>
+    <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4"><Stat label="7-day average" value={`${fmtNum(average(sevenDays.map((log) => log.weightKg)))} kg`} hint={sevenDays.filter((log) => log.weightKg != null).length ? `${sevenDays.filter((log) => log.weightKg != null).length} weigh-in${sevenDays.filter((log) => log.weightKg != null).length === 1 ? '' : 's'}` : 'Add a weigh-in to begin'} /><Stat label={`${range}-day trend`} value={trend == null ? '—' : `${trend > 0 ? '+' : ''}${fmtNum(trend)} kg`} hint={trend == null ? 'Two weigh-ins reveal a trend' : trend <= 0 ? 'Moving in your chosen direction' : 'A normal fluctuation'} tone={trend != null && trend <= 0 ? 'green' : trend != null ? 'amber' : 'plain'} /><Stat label="Fasting streak" value={`${currentStreak(logs, goal, todayKey)} days`} hint={`Current goal: ${goal}+ hours`} tone="soft" /><Stat label="This week" value={compliance(week, goal, todayKey) == null ? '—' : `${compliance(week, goal, todayKey)}%`} hint="Routine score" tone="green" /></section>
 
     <section className="mt-7 grid gap-5 xl:grid-cols-[1.45fr_1fr]">
       <ChartCard title="Weight trend" subtitle="See the signal, not every single fluctuation." range={range} onRange={setRange} empty={!weightPoints.length} emptyAction={<button className="btn-secondary mt-4" onClick={onCheckIn}>Add a weigh-in</button>}><LineChart points={weightPoints} goal={settings.goalWeightKg} /></ChartCard>

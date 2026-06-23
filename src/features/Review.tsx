@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addDays, average, dateFromKey, dateKey, fastingGoal, fmtDate, fmtNum, weekStart } from '../data'
+import { addDays, average, dateFromKey, dateKey, fastingGoal, fmtDate, fmtNum, hasWeightPlateau, weekStart } from '../data'
 import type { AppSettings, DailyLog } from '../types'
 import { Icon, SectionTitle, Stat } from '../components/ui'
 
@@ -12,7 +12,7 @@ export function WeeklyReview({ logs, settings, onBack }: { logs: DailyLog[]; set
   const previous = logs.filter((log) => log.date >= dateKey(addDays(from, -7)) && log.date < selected)
   const avgWeight = average(weekly.map((log) => log.weightKg)); const previousWeight = average(previous.map((log) => log.weightKg)); const exercise = weekly.reduce((sum, log) => sum + (log.exerciseMinutes ?? 0), 0)
   const averages = starts.map((start) => average(logs.filter((log) => log.date >= start && log.date <= dateKey(addDays(dateFromKey(start), 6))).map((log) => log.weightKg))).filter((value): value is number => value != null).reverse()
-  const plateau = averages.length >= 4 && averages.slice(-4).every((value, index, list) => index === 0 || list[index - 1] - value < 0.1)
+  const plateau = hasWeightPlateau(averages)
   const suggestions = [plateau && 'Your trend has been steady for a few weeks. Revisit snacks, sugary drinks, and weekend rhythm with curiosity—not blame.', average(weekly.map((log) => log.hungerLevel)) != null && average(weekly.map((log) => log.hungerLevel))! >= 7 && 'Hunger ran high. A little more protein and vegetables at meals may help next week feel easier.', average(weekly.map((log) => log.sleepHours)) != null && average(weekly.map((log) => log.sleepHours))! < 7 && 'Sleep was lighter this week. A steadier wind-down can make hunger more manageable.', exercise < 100 && 'Movement was light. A short walk after one meal is a gentle place to start.', !plateau && exercise >= 100 && 'The basics are showing up. Keep next week uncomplicated and repeat what worked.'].filter(Boolean) as string[]
   return <>
     <SectionTitle eyebrow="Weekly reflection" title="Notice what supported you." subtitle="A kind look back, followed by one simple next step." action={<button className="btn-secondary" onClick={onBack}>Back to more</button>} />

@@ -69,22 +69,24 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: ".dockerignore,Dockerfile,compose.yaml,package.json,package-lock.json,tsconfig.json,tsconfig.app.json,tsconfig.node.json,tsconfig.server.json,vite.config.ts,index.html,public,src,server"
+          source: ".dockerignore,Dockerfile,compose.yaml,package.json,package-lock.json,tsconfig.json,tsconfig.app.json,tsconfig.node.json,tsconfig.server.json,vite.config.ts,index.html,public,shared,src,server"
           target: weight-path
 
       - name: Configure and deploy container
         uses: appleboy/ssh-action@v1.2.4
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGO_DB_NAME: ${{ secrets.MONGO_DB_NAME }}
           APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          APP_TIME_ZONE: ${{ secrets.APP_TIME_ZONE }}
           WEBAPP_PORT: ${{ secrets.WEBAPP_PORT }}
         with:
           host: ${{ secrets.VPS_HOST }}
           port: ${{ secrets.VPS_PORT }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: MONGO_URI,APP_PASSWORD,SESSION_SECRET,WEBAPP_PORT
+          envs: MONGO_URI,MONGO_DB_NAME,APP_PASSWORD,SESSION_SECRET,APP_TIME_ZONE,WEBAPP_PORT
           script: |
             set -eu
             cd "$HOME/weight-path"
@@ -95,6 +97,8 @@ jobs:
             SESSION_SECRET=$SESSION_SECRET
             WEBAPP_PORT=$WEBAPP_PORT
             EOF
+            if [ -n "$MONGO_DB_NAME" ]; then echo "MONGO_DB_NAME=$MONGO_DB_NAME" >> .env; fi
+            if [ -n "$APP_TIME_ZONE" ]; then echo "APP_TIME_ZONE=$APP_TIME_ZONE" >> .env; fi
             docker compose up -d --build --remove-orphans
             for attempt in 1 2 3 4 5 6 7 8 9 10; do
               if curl -fsS "http://127.0.0.1:$WEBAPP_PORT/health"; then
