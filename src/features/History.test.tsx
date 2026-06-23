@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { History } from './History'
 import { emptyLog, type AppSettings } from '../types'
 
-const settings: AppSettings = { heightCm: 176, startingWeightKg: 111, targetLowKg: 92, targetHighKg: 96, planStartDate: '2026-01-01' }
+const settings: AppSettings = { heightCm: 176, startingWeightKg: 111, goalWeightKg: 85, planStartDate: '2026-01-01', goalDate: '2027-01-01' }
 
 describe('History confirmations', () => {
   it('uses an in-app dialog before deleting a record', () => {

@@ -69,6 +69,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .progress-track { height: .65rem; overflow: hidden; border-radius: 999px; background: #c6ddc7; margin: .8rem 0 .5rem; }
 .progress-track span { display: block; height: 100%; min-width: .65rem; border-radius: inherit; background: #276047; transition: width .25s ease; }
 .hero-target { display: flex; align-items: center; gap: .35rem; margin-top: 1rem; color: #3e6349; font-size: .78rem; font-weight: 750; }
+.hero-goal-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: .9rem; border-top: 1px solid rgb(64 113 72 / .14); padding-top: .85rem; }.hero-goal-meta span { display: block; color: rgb(62 99 73 / .7); font-size: .65rem; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }.hero-goal-meta b { display: block; margin-top: .15rem; color: #31573c; font-size: .77rem; }
 .stat-card { min-height: 8.5rem; border: 1px solid #e0e7e0; border-radius: 1rem; background: #fff; padding: 1rem; box-shadow: 0 2px 5px rgb(34 62 44 / .025); }
 .stat-green { border-color: #c8dfcb; background: #f1f8f0; }.stat-amber { border-color: #eadab4; background: #fffaf0; }.stat-soft { border-color: #d6e2df; background: #f2f7f5; }
 .stat-label { margin: 0; color: #718077; font-size: .67rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }.stat-value { margin: .45rem 0 0; color: #263b2e; font-size: clamp(1.35rem, 4vw, 1.72rem); font-weight: 760; letter-spacing: -.045em; }.stat-hint { margin: .42rem 0 0; color: #748079; font-size: .72rem; line-height: 1.35; }

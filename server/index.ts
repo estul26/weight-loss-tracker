@@ -8,14 +8,15 @@ import { MongoClient, type Collection } from 'mongodb'
 
 type RefinedCarbs = 'none' | 'low' | 'medium' | 'high'
 interface DailyLog { id: string; date: string; weightKg: number | null; eatingWindowStart: string; eatingWindowEnd: string; fastingHours: number | null; firstMeal: string; secondMeal: string; snacks: boolean; lateNightEating: boolean; sugaryDrink: boolean; refinedCarbs: RefinedCarbs; exerciseType: string; exerciseMinutes: number | null; sleepHours: number | null; hungerLevel: number | null; energyLevel: number | null; moodLevel: number | null; notes: string; biggestProblem: string; tomorrowFocus: string; createdAt: string; updatedAt: string }
-interface AppSettings { heightCm: number; startingWeightKg: number; targetLowKg: number; targetHighKg: number; planStartDate: string }
+interface AppSettings { heightCm: number; startingWeightKg: number; goalWeightKg: number; planStartDate: string; goalDate: string }
 interface TrackerState { _id: 'owner'; settings: AppSettings; logs: DailyLog[]; updatedAt: string }
 
 for (const key of ['MONGO_URI', 'APP_PASSWORD', 'SESSION_SECRET'] as const) if (!process.env[key]) throw new Error(`${key} must be set`)
 const mongo = new MongoClient(process.env.MONGO_URI!)
 let collection: Collection<TrackerState>
 const today = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` }
-const defaults = (): AppSettings => ({ heightCm: 176, startingWeightKg: 111, targetLowKg: 92, targetHighKg: 96, planStartDate: today() })
+const addCalendarYear = (date: string) => { const [year, month, day] = date.split('-').map(Number); const nextYear = year + 1; const lastDayOfMonth = new Date(nextYear, month, 0).getDate(); return `${nextYear}-${String(month).padStart(2, '0')}-${String(Math.min(day, lastDayOfMonth)).padStart(2, '0')}` }
+const defaults = (): AppSettings => { const planStartDate = today(); return { heightCm: 176, startingWeightKg: 111, goalWeightKg: 85, planStartDate, goalDate: addCalendarYear(planStartDate) } }
 const app = express()
 app.set('trust proxy', 1)
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }))
@@ -29,7 +30,7 @@ const auth = (request: Request, response: Response, next: NextFunction) => sessi
 const nullableNumber = (value: unknown, min: number, max: number) => value == null || value === '' ? null : typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max ? value : undefined
 const text = (value: unknown, max = 2000) => typeof value === 'string' ? value.slice(0, max) : ''
 const bool = (value: unknown) => value === true
-const isDate = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+const isDate = (value: unknown): value is string => { if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false; const [year, month, day] = value.split('-').map(Number); const parsed = new Date(Date.UTC(year, month - 1, day)); return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day }
 const isTime = (value: unknown): value is string => typeof value === 'string' && /^\d{2}:\d{2}$/.test(value)
 
 function cleanLog(input: unknown, existing?: DailyLog): DailyLog | null {
@@ -41,8 +42,8 @@ function cleanLog(input: unknown, existing?: DailyLog): DailyLog | null {
   const refinedCarbs: RefinedCarbs = ['none', 'low', 'medium', 'high'].includes(String(raw.refinedCarbs)) ? raw.refinedCarbs as RefinedCarbs : 'none'; const now = new Date().toISOString()
   return { id: existing?.id ?? (typeof raw.id === 'string' && raw.id ? raw.id : crypto.randomUUID()), date, weightKg, eatingWindowStart: raw.eatingWindowStart as string, eatingWindowEnd: raw.eatingWindowEnd as string, fastingHours, firstMeal: text(raw.firstMeal), secondMeal: text(raw.secondMeal), snacks: bool(raw.snacks), lateNightEating: bool(raw.lateNightEating), sugaryDrink: bool(raw.sugaryDrink), refinedCarbs, exerciseType: text(raw.exerciseType, 120), exerciseMinutes, sleepHours, hungerLevel, energyLevel, moodLevel, notes: text(raw.notes, 5000), biggestProblem: text(raw.biggestProblem), tomorrowFocus: text(raw.tomorrowFocus), createdAt: existing?.createdAt ?? now, updatedAt: now }
 }
-function cleanSettings(input: unknown, fallback: AppSettings): AppSettings | null { if (!input || typeof input !== 'object') return null; const raw = input as Record<string, unknown>; const heightCm = nullableNumber(raw.heightCm, 100, 250); const startingWeightKg = nullableNumber(raw.startingWeightKg, 30, 300); const targetLowKg = nullableNumber(raw.targetLowKg, 30, 300); const targetHighKg = nullableNumber(raw.targetHighKg, 30, 300); if ([heightCm, startingWeightKg, targetLowKg, targetHighKg].some((v) => v == null) || !isDate(raw.planStartDate)) return null; return { ...fallback, heightCm: heightCm!, startingWeightKg: startingWeightKg!, targetLowKg: targetLowKg!, targetHighKg: targetHighKg!, planStartDate: raw.planStartDate as string } }
-async function state() { const found = await collection.findOne({ _id: 'owner' }); if (found) return found; const initial: TrackerState = { _id: 'owner', settings: defaults(), logs: [], updatedAt: new Date().toISOString() }; await collection.insertOne(initial); return initial }
+function cleanSettings(input: unknown, fallback: AppSettings): AppSettings | null { if (!input || typeof input !== 'object') return null; const raw = input as Record<string, unknown>; const heightCm = nullableNumber(raw.heightCm, 100, 250); const startingWeightKg = nullableNumber(raw.startingWeightKg, 30, 300); const goalWeightKg = nullableNumber(raw.goalWeightKg ?? raw.targetHighKg, 30, 300); const planStartDate = raw.planStartDate; const goalDate = isDate(raw.goalDate) ? raw.goalDate : isDate(planStartDate) ? addCalendarYear(planStartDate) : null; if ([heightCm, startingWeightKg, goalWeightKg].some((v) => v == null) || !isDate(planStartDate) || !goalDate || goalDate <= planStartDate) return null; return { ...fallback, heightCm: heightCm!, startingWeightKg: startingWeightKg!, goalWeightKg: goalWeightKg!, planStartDate, goalDate } }
+async function state() { const found = await collection.findOne({ _id: 'owner' }); if (found) { const settings = cleanSettings(found.settings, defaults()); if (!settings) throw new Error('Stored settings are invalid.'); if (!('goalWeightKg' in found.settings) || !('goalDate' in found.settings)) { found.settings = settings; await save(found) } return found } const initial: TrackerState = { _id: 'owner', settings: defaults(), logs: [], updatedAt: new Date().toISOString() }; await collection.insertOne(initial); return initial }
 async function save(next: TrackerState) { next.updatedAt = new Date().toISOString(); await collection.replaceOne({ _id: 'owner' }, next, { upsert: true }); return next }
 
 app.get('/health', (_request, response) => response.json({ ok: true }))

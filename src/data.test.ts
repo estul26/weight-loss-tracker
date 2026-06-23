@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { compliance, currentStreak, dateKey, fastingGoal, targetProgress, trendChange } from './data'
-import { emptyLog, type AppSettings } from './types'
+import { compliance, currentStreak, dateKey, fastingGoal, goalDaysRemaining, requiredWeeklyLoss, targetProgress, trendChange } from './data'
+import { addCalendarYear, emptyLog, isDateKey, normalizeSettings, type AppSettings } from './types'
 
-const settings: AppSettings = { heightCm: 170, startingWeightKg: 100, targetLowKg: 80, targetHighKg: 85, planStartDate: '2026-06-01' }
+const settings: AppSettings = { heightCm: 170, startingWeightKg: 100, goalWeightKg: 85, planStartDate: '2026-06-01', goalDate: '2027-06-01' }
 const log = (date: string, weightKg: number, fastingHours = 16) => ({ ...emptyLog(date), weightKg, fastingHours, exerciseMinutes: 20, sleepHours: 7 })
 
 describe('tracker calculations', () => {
@@ -16,6 +16,18 @@ describe('tracker calculations', () => {
     expect(targetProgress(110, settings)).toBe(0)
     expect(targetProgress(80, settings)).toBe(100)
     expect(trendChange([log('2026-06-02', 96), log('2026-06-01', 98)])).toBe(-2)
+  })
+
+  it('calculates a calendar-year deadline and the fixed pace required from the plan baseline', () => {
+    expect(addCalendarYear('2024-02-29')).toBe('2025-02-28')
+    expect(isDateKey('2026-02-30')).toBe(false)
+    expect(goalDaysRemaining(settings, '2026-06-01')).toBe(365)
+    expect(goalDaysRemaining(settings, '2027-06-02')).toBe(-1)
+    expect(requiredWeeklyLoss(settings)).toBeCloseTo(15 / (365 / 7))
+  })
+
+  it('normalizes legacy target ranges from older saved data and backups', () => {
+    expect(normalizeSettings({ heightCm: 170, startingWeightKg: 100, targetLowKg: 80, targetHighKg: 85, planStartDate: '2026-06-01' }, settings)).toEqual(settings)
   })
 
   it('calculates fasting goals, streaks, and compliance', () => {

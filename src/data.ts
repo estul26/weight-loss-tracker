@@ -34,11 +34,22 @@ export const fastingGoal = (settings: AppSettings) => {
   return 16
 }
 export const targetProgress = (weight: number, settings: AppSettings) => {
-  const distance = settings.startingWeightKg - settings.targetHighKg
+  const distance = settings.startingWeightKg - settings.goalWeightKg
   if (distance <= 0) return 0
   return Math.max(0, Math.min(100, ((settings.startingWeightKg - weight) / distance) * 100))
 }
 export const weightChange = (weight: number, settings: AppSettings) => settings.startingWeightKg - weight
+export const calendarDayDifference = (from: string, until: string) => {
+  const [fromYear, fromMonth, fromDay] = from.split('-').map(Number)
+  const [untilYear, untilMonth, untilDay] = until.split('-').map(Number)
+  return Math.round((Date.UTC(untilYear, untilMonth - 1, untilDay) - Date.UTC(fromYear, fromMonth - 1, fromDay)) / 86_400_000)
+}
+export const goalDaysRemaining = (settings: AppSettings, today = dateKey(new Date())) => calendarDayDifference(today, settings.goalDate)
+export const requiredWeeklyLoss = (settings: AppSettings) => {
+  const totalDays = calendarDayDifference(settings.planStartDate, settings.goalDate)
+  const remainingLoss = settings.startingWeightKg - settings.goalWeightKg
+  return totalDays > 0 && remainingLoss > 0 ? remainingLoss / (totalDays / 7) : 0
+}
 export const trendChange = (logs: DailyLog[]) => {
   const weights = logs.filter((log) => log.weightKg != null).sort((a, b) => a.date.localeCompare(b.date))
   if (weights.length < 2) return null

@@ -51,7 +51,7 @@ function App() {
       {page === 'history' && <History logs={ordered} settings={settings} onEdit={(log) => openCheckIn(log.date)} onDelete={removeLog} onImport={importLogs} />}
       {page === 'more' && <More onNavigate={navigate} />}
       {page === 'review' && <WeeklyReview logs={logs} settings={settings} onBack={() => navigate('more')} />}
-      {page === 'settings' && <Settings settings={settings} onSave={saveSettings} onBack={() => navigate('more')} />}
+      {page === 'settings' && <Settings settings={settings} logs={logs} onSave={saveSettings} onBack={() => navigate('more')} />}
       {page === 'rules' && <Rules onBack={() => navigate('more')} />}
     </main>
     <footer className="app-footer">This app is for personal tracking only and is not medical advice. If you have diabetes, use insulin, take glucose-lowering medication, have an eating disorder history, or feel dizzy or unwell during fasting, talk to a doctor.</footer>

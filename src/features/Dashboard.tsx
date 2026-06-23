@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { addDays, average, bmi, compliance, currentStreak, dateKey, fastingGoal, fmtDate, fmtNum, latestLog, targetProgress, trendChange, weightChange, weekStart } from '../data'
+import { addDays, average, compliance, currentStreak, dateKey, fastingGoal, fmtDate, fmtNum, goalDaysRemaining, latestLog, requiredWeeklyLoss, targetProgress, trendChange, weightChange, weekStart } from '../data'
 import type { AppSettings, DailyLog } from '../types'
 import { EmptyState, Icon, SectionTitle, Stat } from '../components/ui'
 
@@ -21,19 +21,23 @@ export function Dashboard({ logs, settings, onCheckIn }: { logs: DailyLog[]; set
   const trend = trendChange(periodLogs)
   const progress = targetProgress(currentWeight, settings)
   const sevenDays = logs.filter((log) => log.date >= dateKey(addDays(today, -6)))
+  const daysRemaining = goalDaysRemaining(settings, dateKey(today))
+  const weeklyPace = requiredWeeklyLoss(settings)
+  const goalReached = currentWeight <= settings.goalWeightKg
+  const deadlineLabel = goalReached ? 'Goal achieved' : daysRemaining < 0 ? `${Math.abs(daysRemaining)} days past target date` : `${daysRemaining} days remaining`
 
   return <>
-    <SectionTitle eyebrow="Your progress" title={latest ? 'Steady days add up.' : 'Your path starts here.'} subtitle={latest ? `Last weigh-in ${fmtDate(latest.date)} · Your target is ${fmtNum(settings.targetLowKg, 0)}–${fmtNum(settings.targetHighKg, 0)} kg.` : 'Build a kind, honest record of the habits that support you.'} action={<button className="btn" onClick={onCheckIn}><Icon name="check" className="h-4 w-4" />{todayLogged ? 'Update today' : 'Log today'}</button>} />
+    <SectionTitle eyebrow="Your progress" title={latest ? 'Steady days add up.' : 'Your path starts here.'} subtitle={latest ? `Last weigh-in ${fmtDate(latest.date)} · Your target is ${fmtNum(settings.goalWeightKg, 0)} kg by ${fmtDate(settings.goalDate)}.` : `Your target is ${fmtNum(settings.goalWeightKg, 0)} kg by ${fmtDate(settings.goalDate)}.`} action={<button className="btn" onClick={onCheckIn}><Icon name="check" className="h-4 w-4" />{todayLogged ? 'Update today' : 'Log today'}</button>} />
 
     <section className="progress-hero">
       <div className="progress-hero-main"><div className="flex items-center gap-2 text-emerald-950/70"><span className="hero-icon"><Icon name="trend" className="h-5 w-5" /></span><span className="text-sm font-semibold">Current weight</span></div><p className="hero-weight">{fmtNum(currentWeight)} <span>kg</span></p><p className="mt-1 text-sm text-emerald-950/70">{latest ? `${fmtNum(weightChange(currentWeight, settings))} kg from your starting point` : `Starting point: ${fmtNum(settings.startingWeightKg)} kg`}</p></div>
-      <div className="progress-hero-side"><div className="flex items-center justify-between text-sm"><span className="font-semibold text-emerald-950">Path to target</span><span className="font-bold text-emerald-800">{Math.round(progress)}%</span></div><div className="progress-track" role="progressbar" aria-label="Progress toward target weight" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><span style={{ width: `${progress}%` }} /></div><div className="flex justify-between text-xs text-emerald-950/65"><span>Start {fmtNum(settings.startingWeightKg, 0)}</span><span>Goal {fmtNum(settings.targetHighKg, 0)} kg</span></div><div className="hero-target"><Icon name="target" className="h-4 w-4" />Target range {fmtNum(settings.targetLowKg, 0)}–{fmtNum(settings.targetHighKg, 0)} kg</div></div>
+      <div className="progress-hero-side"><div className="flex items-center justify-between text-sm"><span className="font-semibold text-emerald-950">Path to target</span><span className="font-bold text-emerald-800">{Math.round(progress)}%</span></div><div className="progress-track" role="progressbar" aria-label="Progress toward target weight" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><span style={{ width: `${progress}%` }} /></div><div className="flex justify-between text-xs text-emerald-950/65"><span>Start {fmtNum(settings.startingWeightKg, 0)}</span><span>Goal {fmtNum(settings.goalWeightKg, 0)} kg</span></div><div className="hero-target"><Icon name="target" className="h-4 w-4" />Goal {fmtNum(settings.goalWeightKg, 0)} kg by {fmtDate(settings.goalDate)}</div><div className="hero-goal-meta"><div><span>Deadline</span><b>{deadlineLabel}</b></div><div><span>Required pace</span><b>{goalReached ? '0.0 kg/week' : `${fmtNum(weeklyPace, 2)} kg/week`}</b></div></div></div>
     </section>
 
     <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4"><Stat label="7-day average" value={`${fmtNum(average(sevenDays.map((log) => log.weightKg)))} kg`} hint={sevenDays.length ? `${sevenDays.length} logged day${sevenDays.length === 1 ? '' : 's'}` : 'Add a weigh-in to begin'} /><Stat label={`${range}-day trend`} value={trend == null ? '—' : `${trend > 0 ? '+' : ''}${fmtNum(trend)} kg`} hint={trend == null ? 'Two weigh-ins reveal a trend' : trend <= 0 ? 'Moving in your chosen direction' : 'A normal fluctuation'} tone={trend != null && trend <= 0 ? 'green' : trend != null ? 'amber' : 'plain'} /><Stat label="Fasting streak" value={`${currentStreak(logs, goal)} days`} hint={`Current goal: ${goal}+ hours`} tone="soft" /><Stat label="This week" value={compliance(week, goal) == null ? '—' : `${compliance(week, goal)}%`} hint="Routine score" tone="green" /></section>
 
     <section className="mt-7 grid gap-5 xl:grid-cols-[1.45fr_1fr]">
-      <ChartCard title="Weight trend" subtitle="See the signal, not every single fluctuation." range={range} onRange={setRange} empty={!weightPoints.length} emptyAction={<button className="btn-secondary mt-4" onClick={onCheckIn}>Add a weigh-in</button>}><LineChart points={weightPoints} goal={settings.targetHighKg} /></ChartCard>
+      <ChartCard title="Weight trend" subtitle="See the signal, not every single fluctuation." range={range} onRange={setRange} empty={!weightPoints.length} emptyAction={<button className="btn-secondary mt-4" onClick={onCheckIn}>Add a weigh-in</button>}><LineChart points={weightPoints} goal={settings.goalWeightKg} /></ChartCard>
       <ChartCard title="Fasting rhythm" subtitle={`Your ${goal}+ hour goal is shown in deep green.`} range={range} onRange={setRange} empty={!fastingPoints.length} emptyAction={<button className="btn-secondary mt-4" onClick={onCheckIn}>Log today</button>}><BarChart points={fastingPoints} goal={goal} /></ChartCard>
     </section>
 
