@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { compliance, currentStreak, dateKey, fastingGoal, goalDaysRemaining, requiredWeeklyLoss, targetProgress, trendChange } from './data'
-import { addCalendarYear, emptyLog, isDateKey, normalizeSettings, type AppSettings } from './types'
+import { addCalendarYear, defaultSettings, emptyLog, isDateKey, normalizeSettings, type AppSettings } from './types'
 
 const settings: AppSettings = { heightCm: 170, startingWeightKg: 100, goalWeightKg: 85, planStartDate: '2026-06-01', goalDate: '2027-06-01' }
 const log = (date: string, weightKg: number, fastingHours = 16) => ({ ...emptyLog(date), weightKg, fastingHours, exerciseMinutes: 20, sleepHours: 7 })
@@ -18,12 +18,21 @@ describe('tracker calculations', () => {
     expect(trendChange([log('2026-06-02', 96), log('2026-06-01', 98)])).toBe(-2)
   })
 
-  it('calculates a calendar-year deadline and the fixed pace required from the plan baseline', () => {
+  it('calculates a calendar-year deadline and the pace required from the current weight', () => {
     expect(addCalendarYear('2024-02-29')).toBe('2025-02-28')
     expect(isDateKey('2026-02-30')).toBe(false)
     expect(goalDaysRemaining(settings, '2026-06-01')).toBe(365)
     expect(goalDaysRemaining(settings, '2027-06-02')).toBe(-1)
-    expect(requiredWeeklyLoss(settings)).toBeCloseTo(15 / (365 / 7))
+    expect(requiredWeeklyLoss(92.5, settings, '2026-12-01')).toBeCloseTo(7.5 / (182 / 7))
+    expect(requiredWeeklyLoss(84, settings, '2026-12-01')).toBe(0)
+    expect(requiredWeeklyLoss(92.5, settings, '2027-06-02')).toBeNull()
+  })
+
+  it('uses the personal 110.2 kg default and marks loss metrics unavailable for non-loss targets', () => {
+    const nonLossSettings = { ...settings, goalWeightKg: 105 }
+    expect(defaultSettings.startingWeightKg).toBe(110.2)
+    expect(targetProgress(100, nonLossSettings)).toBeNull()
+    expect(requiredWeeklyLoss(100, nonLossSettings, '2026-12-01')).toBeNull()
   })
 
   it('normalizes legacy target ranges from older saved data and backups', () => {

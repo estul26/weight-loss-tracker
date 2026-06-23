@@ -6,20 +6,20 @@ import { emptyLog, type AppSettings } from '../types'
 const settings: AppSettings = { heightCm: 176, startingWeightKg: 111, goalWeightKg: 92, planStartDate: '2026-01-01', goalDate: '2027-01-01' }
 
 describe('Settings', () => {
-  it('starts an 85 kg plan from the latest weighted log and snapshots a one-year deadline', async () => {
+  it('restarts a plan from the latest weighted log while preserving the selected goal', async () => {
     const save = vi.fn(async () => undefined)
     const older = { ...emptyLog('2026-06-01'), weightKg: 104 }
     const latest = { ...emptyLog('2026-06-20'), weightKg: 101.5 }
     render(<Settings settings={settings} logs={[older, latest]} onSave={save} onBack={() => undefined} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start/restart 85 kg plan' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start/restart plan' }))
 
-    await waitFor(() => expect(save).toHaveBeenCalledWith({ ...settings, startingWeightKg: 101.5, goalWeightKg: 85, planStartDate: '2026-06-20', goalDate: '2027-06-20' }))
+    await waitFor(() => expect(save).toHaveBeenCalledWith({ ...settings, startingWeightKg: 101.5, planStartDate: '2026-06-20', goalDate: '2027-06-20' }))
   })
 
   it('does not allow a new plan without a recorded weight', () => {
     render(<Settings settings={settings} logs={[emptyLog('2026-06-20')]} onSave={async () => undefined} onBack={() => undefined} />)
-    expect(screen.getByRole('button', { name: 'Start/restart 85 kg plan' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Start/restart plan' })).toBeDisabled()
     expect(screen.getByText('Log a morning weight before starting a new plan.')).toBeInTheDocument()
   })
 
@@ -32,5 +32,15 @@ describe('Settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save settings' }))
 
     await waitFor(() => expect(save).toHaveBeenCalledWith({ ...settings, heightCm: 180 }))
+  })
+
+  it('saves a corrected 110.2 kg baseline without changing the goal or plan dates', async () => {
+    const save = vi.fn(async () => undefined)
+    render(<Settings settings={settings} logs={[]} onSave={save} onBack={() => undefined} />)
+
+    fireEvent.change(screen.getByLabelText('Starting weight (kg)'), { target: { value: '110.2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }))
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith({ ...settings, startingWeightKg: 110.2 }))
   })
 })

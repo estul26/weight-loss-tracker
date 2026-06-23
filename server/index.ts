@@ -16,7 +16,7 @@ const mongo = new MongoClient(process.env.MONGO_URI!)
 let collection: Collection<TrackerState>
 const today = () => { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` }
 const addCalendarYear = (date: string) => { const [year, month, day] = date.split('-').map(Number); const nextYear = year + 1; const lastDayOfMonth = new Date(nextYear, month, 0).getDate(); return `${nextYear}-${String(month).padStart(2, '0')}-${String(Math.min(day, lastDayOfMonth)).padStart(2, '0')}` }
-const defaults = (): AppSettings => { const planStartDate = today(); return { heightCm: 176, startingWeightKg: 111, goalWeightKg: 85, planStartDate, goalDate: addCalendarYear(planStartDate) } }
+const defaults = (): AppSettings => { const planStartDate = today(); return { heightCm: 176, startingWeightKg: 110.2, goalWeightKg: 85, planStartDate, goalDate: addCalendarYear(planStartDate) } }
 const app = express()
 app.set('trust proxy', 1)
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }))

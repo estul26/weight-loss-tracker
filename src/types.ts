@@ -94,7 +94,7 @@ const defaultPlanStartDate = localToday()
 
 export const defaultSettings: AppSettings = {
   heightCm: 176,
-  startingWeightKg: 111,
+  startingWeightKg: 110.2,
   goalWeightKg: 85,
   planStartDate: defaultPlanStartDate,
   goalDate: addCalendarYear(defaultPlanStartDate),
